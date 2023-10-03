@@ -2,11 +2,16 @@ package com.gabidbr.customer;
 
 import com.gabidbr.clients.fraud.FraudCheckResponse;
 import com.gabidbr.clients.fraud.FraudClient;
+import com.gabidbr.clients.notification.NotificationClient;
+import com.gabidbr.clients.notification.NotificationRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 @Service
-public record CustomerService(CustomerRepository customerRepository, RestTemplate restTemplate, FraudClient fraudClient) {
+public record CustomerService(CustomerRepository customerRepository,
+                              RestTemplate restTemplate,
+                              FraudClient fraudClient,
+                              NotificationClient notificationClient) {
     public void registerCustomer(CustomerRegistrationRequest request) {
         Customer customer = Customer.builder()
                 .firstName(request.firstName())
@@ -30,6 +35,13 @@ public record CustomerService(CustomerRepository customerRepository, RestTemplat
             throw new IllegalStateException("Customer is a fraudster");
         }
 
-        // TODO send notification
+        // TODO to make it async, i.e add to a queue
+        notificationClient.sendNotification(
+                new NotificationRequest(
+                        customer.getId(),
+                        customer.getFirstName(),
+                        String.format("Welcome %s to our awesome platform",
+                                customer.getFirstName())
+        ));
     }
 }
