@@ -1,5 +1,6 @@
 package com.gabidbr.customer;
 
+import com.gabidbr.amqp.RabbitMqMessageProducer;
 import com.gabidbr.clients.fraud.FraudCheckResponse;
 import com.gabidbr.clients.fraud.FraudClient;
 import com.gabidbr.clients.notification.NotificationClient;
@@ -11,7 +12,7 @@ import org.springframework.web.client.RestTemplate;
 public record CustomerService(CustomerRepository customerRepository,
                               RestTemplate restTemplate,
                               FraudClient fraudClient,
-                              NotificationClient notificationClient) {
+                              RabbitMqMessageProducer rabbitMqMessageProducer) {
     public void registerCustomer(CustomerRegistrationRequest request) {
         Customer customer = Customer.builder()
                 .firstName(request.firstName())
@@ -35,13 +36,17 @@ public record CustomerService(CustomerRepository customerRepository,
             throw new IllegalStateException("Customer is a fraudster");
         }
 
-        // TODO to make it async, i.e add to a queue
-        notificationClient.sendNotification(
-                new NotificationRequest(
-                        customer.getId(),
-                        customer.getFirstName(),
-                        String.format("Welcome %s to our awesome platform",
-                                customer.getFirstName())
-        ));
+        NotificationRequest notificationRequest = new NotificationRequest(
+                customer.getId(),
+                customer.getFirstName(),
+                String.format("Welcome %s to our awesome platform",
+                        customer.getFirstName())
+        );
+//        notificationClient.sendNotification(notificationRequest);
+        rabbitMqMessageProducer.publish(
+                notificationRequest,
+                "internal.exchange",
+                "internal.notification.routing-key"
+        );
     }
 }
